@@ -210,7 +210,7 @@ glm(sum_deaths ~ log(Unemployed) + Median.Household.Income. + County + sum_patco
   tidy()
 
 #trying interactions
-glm(sum_deaths ~ log(Unemployed) + Median.Household.Income. + County + sum_patcount_opioid + log(Number.in.Poverty) + Year + log(Unemployed)*County + Median.Household.Income.*County + Year*County + sum_patcount_opioid*County + log(Number.in.Poverty)*County, data = clean_mega_data, family = "poisson") |>
+glm(sum_deaths ~ log(Unemployed) + Median.Household.Income. + County + log(sum_patcount_opioid) + log(Number.in.Poverty) + Year + County*Year, data = clean_mega_data, family = "poisson") |>
   tidy()
 ```
 
