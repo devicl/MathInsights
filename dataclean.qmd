@@ -1,6 +1,6 @@
 ---
 title: "dataclean"
-------
+---
 
 ```{r}
 library(tidyverse)
@@ -226,11 +226,6 @@ ca_counties <- ca_counties |>
 clean_mega_data_location <- inner_join(clean_mega_data, ca_counties, by = "County")
 
 clean_mega_data_location
-clean_mega_data_location_20 <- inner_join(clean_mega_data_20, ca_counties, by = "County")
-clean_mega_data_location_21 <- inner_join(clean_mega_data_21, ca_counties, by = "County")
-clean_mega_data_location_22 <- inner_join(clean_mega_data_22, ca_counties, by = "County")
-clean_mega_data_location_23 <- inner_join(clean_mega_data_23, ca_counties, by = "County")
-
 #creating subplots using plotly
 g <- list(
   scope = 'usa',
