@@ -1,0 +1,326 @@
+---
+title: "dataclean"
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(broom)
+library(eeptools)
+library(stringr)
+library(plotly)
+library(rjson)
+```
+
+## Functions to help clean data
+```{r}
+#function to get rid of all commas in every column that's a character but should be numeric and turns them numeric
+no_comma <- function(df) {
+  for(col in names(df)) {
+    if(str_detect(col, "Code$")) next
+    if(str_detect(col, "FIPS$")) next
+    if(is.character(df[[col]])) {
+      clean <- str_replace_all(df[[col]], ",", "")
+      number <- str_detect(df[[col]], "\\d$")
+      if(mean(number, na.rm = TRUE) > 0.5) {
+        df[[col]] <- as.numeric(clean)
+      }
+    }
+  } 
+    return(df)
+}
+
+#function to combine state and county fip
+FIP <- function(state, county) {
+  first <- str_pad(state, width = 2, side = "left", pad = "0")
+  second <- str_pad(county, width = 3, side = "left", pad = "0")
+  combine <- str_c(first, second)
+return(combine)
+}
+
+```
+
+##Gathering and Cleaning of National Data 
+```{r}
+#provisional drug overdose death counts from CDC
+drug_overdose <- read.csv("VSRR_Provisional_County-Level_Drug_Overdose_Death_Counts.csv")
+
+#filtered to only show drug overdose in CA
+ca_drug_overdose <- drug_overdose|>
+  select(STATE_NAME, Year, Month, COUNTYNAME, `Provisional.Drug.Overdose.Deaths`) |>
+  filter(`STATE_NAME` == "California") |>
+  arrange((Year))
+ca_drug_overdose
+
+#prescription data from CURES for CA
+prescription_county <- read.csv("Metrics_Yr_County_AgeGrp (1).csv")
+prescription_county
+
+#unemployment rates by county data combined from US Bureau of Labor Statistics
+twenty_four_labor <- read.csv("laucnty24 (2).csv")
+twenty_three_labor <- read.csv("laucnty23.csv")
+twenty_two_labor <- read.csv("laucnty22.csv")
+twenty_one_labor <- read.csv("laucnty21.csv")
+twenty_labor <- read.csv("laucnty20.csv")
+
+unemployment <- rbind(twenty_four_labor, twenty_three_labor, by = "Year")
+unemployment <- rbind(unemployment, twenty_two_labor, by = "Year")
+unemployment <- rbind(unemployment, twenty_one_labor, by = "Year")
+unemployment <- rbind(unemployment, twenty_labor, by = "Year")
+unemployment
+
+#small area income and poverty estimates from SAIPE
+poverty_estimates <- read.csv("poverty_estimates.csv")
+median_income <- read.csv("median_income.csv")
+poverty <- inner_join(poverty_estimates, median_income, by = c("Year", "Name", "ID"))
+
+
+#cleaned numbers in data
+unemployment <- no_comma(unemployment)
+unemployment 
+
+drug_overdose <- no_comma(drug_overdose)
+
+drug_overdose |>
+  filter(Year == 2024)
+
+
+drug_overdose_2020_23 |>
+  filter(Year == 2024)
+
+
+ca_drug_overdose <- no_comma(ca_drug_overdose)
+ca_drug_overdose
+
+prescription_county <- no_comma(prescription_county)
+prescription_county 
+
+poverty <- no_comma(poverty)
+#getting rid of confidence interval columns
+poverty <- poverty |>
+  select(-X90..Confidence.Interval.x) 
+
+poverty <- poverty |>
+  select(-X90..Confidence.Interval.1) 
+
+poverty <- poverty |>
+  select(-X90..Confidence.Interval.y) 
+
+poverty
+```
+
+## Matching all dataframes from 2020-2023 by year/county in CA
+```{r}
+drug_overdose |>
+  filter(Year == 2023) |>
+  group_by(COUNTYNAME) |>
+  mutate(sum_deaths = sum(Provisional.Drug.Overdose.Deaths))
+
+
+drug_overdose_2020_23 <- drug_overdose |>
+  select(-Month) |>
+  mutate(County = COUNTYNAME) |>
+  group_by(Year, County) |>
+  summarize(sum_deaths = sum(Provisional.Drug.Overdose.Deaths, na.rm = TRUE),
+            .groups = "drop")
+
+unemployment |>
+  filter(Year == 2020)
+unemployment_2020_23 <- unemployment[unemployment$Year < 2024,] |>
+  mutate(County = str_remove(County.Name.State.Abbreviation, "\\s*County,\\s*[A-Z]{2}$")) |>
+  mutate(State = str_sub(County.Name.State.Abbreviation, -2, -1))
+unemployment_2020_23 |>
+  filter(County == "Los Angeles")
+
+prescription_county_2020_23 <- prescription_county[prescription_county$xYear > 2019,] 
+prescription_county_2020_23 <- prescription_county_2020_23[prescription_county_2020_23$xYear < 2024,] |>
+  mutate(Year = xYear)
+poverty
+
+poverty <- poverty |>
+  mutate(County = str_remove(Name, "\\s*County$")) |>
+  select(-Name)
+
+demographics <- inner_join(unemployment_2020_23, prescription_county_2020_23, by = c("County", "State", "Year" ))
+
+demographics <- inner_join(demographics, poverty, by = c("County", "Year" ))
+
+demographics <- demographics |>
+  select(-rundatetime)
+
+mega_data <- inner_join(demographics, drug_overdose_2020_23, by = c("Year", "County")) 
+
+
+mega_data
+          
+
+
+```
+
+## Regression with `mega_data`
+```{r}
+#cleaning mega data 
+clean_mega_data <- mega_data
+
+clean_mega_data$fips <- FIP(mega_data$State.FIPS.Code, mega_data$County.FIPS.Code)
+
+clean_mega_data <- clean_mega_data |>
+  na.omit(PatCount_Opioid) |>
+  select(-ID)
+
+clean_mega_data <- clean_mega_data |>
+  group_by(Year, County) |>
+  mutate(sum_patcount_opioid = sum(PatCount_Opioid))
+
+
+#checking conidtions before fitting model
+clean_mega_data |>
+  ggplot(aes(x = jitter(Unemployed), y = sum_deaths)) +
+  geom_point() 
+
+clean_mega_data |>
+  ggplot(aes(x = log(Unemployed), y = sum_deaths)) +
+  geom_point()
+
+clean_mega_data |>
+  ggplot(aes(x = Median.Household.Income., y = sum_deaths)) +
+  geom_point()
+
+clean_mega_data |>
+  ggplot(aes(x = Number.in.Poverty, y = sum_deaths)) +
+  geom_point()
+
+clean_mega_data |>
+  ggplot(aes(x = log(Number.in.Poverty), y = sum_deaths)) +
+  geom_point()
+
+clean_mega_data |>
+  ggplot(aes(x = log(Number.in.Poverty), y = log(sum_deaths))) +
+  geom_point()
+
+clean_mega_data |>
+  ggplot(aes(x = sum_patcount_opioid, y = sum_deaths)) +
+  geom_point()
+
+clean_mega_data |>
+  ggplot(aes(x = jitter(sum_patcount_opioid), y = sum_deaths)) +
+  geom_point()
+
+#poisson regression
+glm(sum_deaths ~ log(Unemployed) + Median.Household.Income. + County + sum_patcount_opioid + log(Number.in.Poverty) + Year, data = clean_mega_data, family = "poisson") |>
+  tidy()
+
+#trying interactions
+glm(sum_deaths ~ log(Unemployed) + Median.Household.Income. + County + log(sum_patcount_opioid) + log(Number.in.Poverty) + Year + County*Year, data = clean_mega_data, family = "poisson") |>
+  tidy()
+```
+
+##Creating Map for `sum_deaths` with `clean_mega_Data`
+```{r}
+#to have coordinates of each county
+ca_counties <- read.csv("ca_counties.csv")
+ca_counties <- ca_counties |>
+  mutate(County = NAME) |>
+  select(County, INTPTLAT, INTPTLON)
+  
+clean_mega_data_location <- inner_join(clean_mega_data, ca_counties, by = "County")
+
+clean_mega_data_location
+#creating subplots using plotly
+g <- list(
+  scope = 'usa',
+  showland = T,
+  landcolor = toRGB("gray90"),
+  showcountries = F,
+  subunitcolor = toRGB("white")
+)
+
+location_op_count <- clean_mega_data_location |>
+  group_by(Year, INTPTLAT, INTPTLON, County, sum_deaths) |>
+  summarise(count = n(), .groups = 'drop')
+
+one_map <-function(df) {
+  yr <- unique(df$Year)
+  plot_geo(df) |>
+    add_trace(
+      geojson=counties,
+      x = ~INTPTLON, y = ~INTPTLAT, 
+      size = ~sum_deaths,
+      color = ~sum_deaths,
+      colorscale = "Viridis",
+      type="choropleth",
+      text = ~paste("County:", County, "<br>Drug Overdose Death Count:", sum_deaths),
+      marker=list(line=list(
+      width=0)),
+      hoverinfo = "text") |>
+    add_text(x = -78, y = 47, text = paste("Year:", yr), color = I("black")) |>
+    layout(geo = g)
+}
+
+plot_list <- location_op_count %>%
+  group_by(Year) %>%
+  group_split() %>%
+  lapply(one_map)
+
+fig <- subplot(plot_list, nrows = 4, margin = 0.01) %>%
+  layout(
+    showlegend = TRUE,
+    title = list(
+      text = "Provisional Drug Overdose Death Count (CDC)",
+      x = 0
+    ),
+    width = 1000,
+    height = 900,
+    hovermode = "closest"
+  )
+
+fig
+
+```
+
+## Creating Map for `percent.in.poverty` using `clean_mega_data`
+```{r}
+#creating subplots using plotly
+location_op_count2 <- clean_mega_data_location |>
+  group_by(Year, INTPTLAT, INTPTLON, County, Percent.in.Poverty) |>
+  summarise(count = n(), .groups = 'drop')
+
+one_map <-function(df) {
+  yr <- unique(df$Year)
+  plot_geo(df) |>
+    add_trace(
+      geojson=counties,
+      x = ~INTPTLON, y = ~INTPTLAT, 
+      size = ~Percent.in.Poverty,
+      color = ~Percent.in.Poverty,
+      colorscale = "Viridis",
+      type="choropleth",
+      text = ~paste("County:", County, "<br>Percent in Poverty:", Percent.in.Poverty),
+      marker=list(line=list(
+      width=0)),
+      hoverinfo = "text") |>
+    add_text(x = -78, y = 47, text = paste("Year:", yr), color = I("black")) |>
+    layout(geo = g)
+}
+
+plot_list2 <- location_op_count2 %>%
+  group_by(Year) %>%
+  group_split() %>%
+  lapply(one_map)
+
+fig2 <- subplot(plot_list2, nrows = 4, margin = 0.01) %>%
+  layout(
+    showlegend = TRUE,
+    title = list(
+      text = "Percent in Poverty by County (SAIPE) ",
+      x = 0
+    ),
+    width = 1000,
+    height = 900,
+    hovermode = "closest"
+  )
+
+fig2
+
+```
+---
