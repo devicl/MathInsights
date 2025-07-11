@@ -8,7 +8,10 @@ website:
     left:
       - href: index.qmd
         text: Home
-      - about.qmd
+      - href: about.qmd
+        text: about
+      - href: dataclean.qmd
+        text: Data Cleaning
 
 format:
   html:

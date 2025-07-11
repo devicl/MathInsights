@@ -2,11 +2,5 @@
 title: "Mathmatical Insights into the Opioid Epidemic"
 ---
 
-<<<<<<< HEAD
-=======
-Hello
 
-This is a Quarto website.
-
->>>>>>> 351ef632bcf8feaed5f0a55eab7a5986622b03e9
 To learn more about Quarto websites visit <https://quarto.org/docs/websites>.

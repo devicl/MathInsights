@@ -13,6 +13,7 @@ library(rjson)
 ```
 
 ## Functions to help clean data
+
 ```{r}
 #function to get rid of all commas in every column that's a character but should be numeric and turns them numeric
 no_comma <- function(df) {
@@ -40,7 +41,8 @@ return(combine)
 
 ```
 
-##Gathering and Cleaning of National Data 
+##Gathering and Cleaning of National Data
+
 ```{r}
 #provisional drug overdose death counts from CDC
 drug_overdose <- read.csv("VSRR_Provisional_County-Level_Drug_Overdose_Death_Counts.csv")
@@ -85,9 +87,10 @@ drug_overdose |>
   filter(Year == 2024)
 
 
-drug_overdose_2020_23 |>
-  filter(Year == 2024)
+# drug_overdose_2020_23 |>
+#   filter(Year == 2024)
 
+#There was no prior mention of this file which caused problems in rendering
 
 ca_drug_overdose <- no_comma(ca_drug_overdose)
 ca_drug_overdose
@@ -110,6 +113,7 @@ poverty
 ```
 
 ## Matching all dataframes from 2020-2023 by year/county in CA
+
 ```{r}
 drug_overdose |>
   filter(Year == 2023) |>
@@ -158,6 +162,7 @@ mega_data
 ```
 
 ## Regression with `mega_data`
+
 ```{r}
 #cleaning mega data 
 clean_mega_data <- mega_data
@@ -216,6 +221,7 @@ glm(sum_deaths ~ log(Unemployed) + Median.Household.Income. + County + log(sum_p
 ```
 
 ##Creating Map for `sum_deaths` with `clean_mega_Data`
+
 ```{r}
 #to have coordinates of each county
 ca_counties <- read.csv("ca_counties.csv")
@@ -243,7 +249,7 @@ one_map <-function(df) {
   yr <- unique(df$Year)
   plot_geo(df) |>
     add_trace(
-      geojson=counties,
+      # geojson = counties,
       x = ~INTPTLON, y = ~INTPTLAT, 
       size = ~sum_deaths,
       color = ~sum_deaths,
@@ -279,6 +285,7 @@ fig
 ```
 
 ## Creating Map for `percent.in.poverty` using `clean_mega_data`
+
 ```{r}
 #creating subplots using plotly
 location_op_count2 <- clean_mega_data_location |>
@@ -289,7 +296,7 @@ one_map <-function(df) {
   yr <- unique(df$Year)
   plot_geo(df) |>
     add_trace(
-      geojson=counties,
+      # geojson=counties,
       x = ~INTPTLON, y = ~INTPTLAT, 
       size = ~Percent.in.Poverty,
       color = ~Percent.in.Poverty,
@@ -323,4 +330,5 @@ fig2 <- subplot(plot_list2, nrows = 4, margin = 0.01) %>%
 fig2
 
 ```
----
+
+------------------------------------------------------------------------
